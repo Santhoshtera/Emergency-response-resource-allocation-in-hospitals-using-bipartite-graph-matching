@@ -1,0 +1,211 @@
+from collections import deque
+import networkx as nx
+import matplotlib.pyplot as plt
+
+class BipartiteGraph:
+    def __init__(self):
+        self.graph = {}
+        self.matches = {}
+        self.dist = {}
+
+    def add_edge(self, u, v):
+        if u not in self.graph:
+            self.graph[u] = []
+        self.graph[u].append(v)
+
+    def bfs(self):
+        queue = deque()
+
+        for u in self.graph:
+            if u not in self.matches:
+                self.dist[u] = 0
+                queue.append(u)
+            else:
+                self.dist[u] = float('inf')
+
+        self.dist['NIL'] = float('inf')
+
+        while queue:
+            u = queue.popleft()
+            if u != 'NIL':
+                for v in self.graph[u]:
+                    next_u = self.matches.get(v, 'NIL')
+                    if self.dist[next_u] == float('inf'):
+                        self.dist[next_u] = self.dist[u] + 1
+                        queue.append(next_u)
+
+        return self.dist['NIL'] != float('inf')
+
+    def dfs(self, u):
+        if u != 'NIL':
+            for v in self.graph[u]:
+                next_u = self.matches.get(v, 'NIL')
+                if self.dist[next_u] == self.dist[u] + 1:
+                    if self.dfs(next_u):
+                        self.matches[v] = u
+                        self.matches[u] = v
+                        return True
+            self.dist[u] = float('inf')
+            return False
+        return True
+
+    def hopcroft_karp(self):
+        result = 0
+        while self.bfs():
+            for u in self.graph:
+                if u not in self.matches:
+                    if self.dfs(u):
+                        result += 1
+        return result
+
+def visualize_bipartite_graph(doctors, wards, matches):
+    # Create a new graph
+    G = nx.Graph()
+
+    # Add nodes with specific bipartite attribute
+    G.add_nodes_from(doctors, bipartite=0)
+    G.add_nodes_from(wards, bipartite=1)
+
+    # Create positions for visualization
+    # Calculate vertical spacing
+    doctor_spacing = 1.0 / (len(doctors) + 1)
+    ward_spacing = 1.0 / (len(wards) + 1)
+
+    # Create position dictionary
+    pos = {}
+
+    # Position doctors on the left
+    for i, doctor in enumerate(doctors, 1):
+        pos[doctor] = (-2, 1 - i * doctor_spacing)
+
+    # Position wards on the right
+    for i, ward in enumerate(wards, 1):
+        pos[ward] = (2, 1 - i * ward_spacing)
+
+    # Add edges and collect matched edges
+    matched_edges = []
+    unmatched_edges = []
+
+    for doctor in doctors:
+        for ward in wards:
+            if matches.get(doctor) == ward or matches.get(ward) == doctor:
+                matched_edges.append((doctor, ward))
+                G.add_edge(doctor, ward)
+            else:
+                unmatched_edges.append((doctor, ward))
+                G.add_edge(doctor, ward)
+
+    # Set up the plot
+    plt.figure(figsize=(15, 10))
+
+    # Draw the graph
+    nx.draw_networkx_nodes(G, pos,
+                          nodelist=doctors,
+                          node_color='lightblue',
+                          node_size=2000,
+                          node_shape='o')
+
+    nx.draw_networkx_nodes(G, pos,
+                          nodelist=wards,
+                          node_color='lightgreen',
+                          node_size=2000,
+                          node_shape='s')
+
+    # Draw edges
+    nx.draw_networkx_edges(G, pos,
+                          edgelist=unmatched_edges,
+                          edge_color='gray',
+                          alpha=0.2,
+                          style='dashed')
+
+    nx.draw_networkx_edges(G, pos,
+                          edgelist=matched_edges,
+                          edge_color='red',
+                          width=2.0)
+
+    # Add labels
+    nx.draw_networkx_labels(G, pos, font_size=8)
+
+    # Add title and legend
+    plt.title("Doctor-Ward Assignment Bipartite Graph", pad=20, size=16)
+
+    # Add legend
+    plt.plot([], [], 'red', linewidth=2, label='Matched')
+    plt.plot([], [], 'gray', linestyle='--', alpha=0.2, label='Possible Assignment')
+    plt.plot([], [], 'o', color='lightblue', label='Doctors')
+    plt.plot([], [], 's', color='lightgreen', label='Wards')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+def main():
+    # Initialize the doctor and ward lists
+    doctors = [
+        "Shell", "Regine", "Sissy", "Calestyna", "Thalia",
+        "Brynna", "Maye", "Concettina", "Minda", "Charissa",
+        "Lanae", "Ida", "Constancekarena"
+    ]
+
+    wards = [
+        "Ambil", "Aundh", "Bopodi", "Shivaji Nagar", "Hadapsar",
+        "Health Center", "Gujarat", "Mundhwa", "Pashan", "Bhawani",
+        "Wanowrie", "Yerawada", "Gururwar", "Kondhwa"
+    ]
+
+    # Create bipartite graph instance
+    bg = BipartiteGraph()
+
+    # Add edges
+    for doctor in doctors:
+        for ward in wards:
+            bg.add_edge(doctor, ward)
+
+    # Find maximum matching
+    max_matching = bg.hopcroft_karp()
+
+    # Print results
+    print("\nHospital Ward Assignment System")
+    print("=" * 40)
+    print(f"\nTotal doctors: {len(doctors)}")
+    print(f"Total wards: {len(wards)}")
+    print(f"Maximum number of assignments possible: {max_matching}")
+
+    print("\nOptimal Ward Assignments:")
+    print("-" * 40)
+
+    # Sort assignments for cleaner output
+    assignments = []
+    for ward, doctor in bg.matches.items():
+        if ward in wards:
+            assignments.append((ward, doctor))
+
+    # Print sorted assignments
+    for ward, doctor in sorted(assignments):
+        print(f"{ward:15} -> Dr. {doctor}")
+
+    # Print unassigned doctors and wards
+    assigned_doctors = set(doctor for _, doctor in assignments)
+    unassigned_doctors = set(doctors) - assigned_doctors
+
+    assigned_wards = set(ward for ward, _ in assignments)
+    unassigned_wards = set(wards) - assigned_wards
+
+    if unassigned_doctors:
+        print("\nUnassigned Doctors:")
+        print("-" * 40)
+        for doctor in sorted(unassigned_doctors):
+            print(f"Dr. {doctor}")
+
+    if unassigned_wards:
+        print("\nUnassigned Wards:")
+        print("-" * 40)
+        for ward in sorted(unassigned_wards):
+            print(ward)
+
+    # Visualize the bipartite graph
+    visualize_bipartite_graph(doctors, wards, bg.matches)
+
+if __name__ == "__main__":
+    main()
