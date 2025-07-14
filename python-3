@@ -1,0 +1,262 @@
+from collections import deque
+import networkx as nx
+import matplotlib.pyplot as plt
+
+class BipartiteGraph:
+    def __init__(self):
+        self.graph = {}
+        self.matches = {}
+        self.dist = {}
+
+    def add_edge(self, u, v):
+        if u not in self.graph:
+            self.graph[u] = []
+        self.graph[u].append(v)
+
+    def bfs(self):
+        queue = deque()
+
+        for u in self.graph:
+            if u not in self.matches:
+                self.dist[u] = 0
+                queue.append(u)
+            else:
+                self.dist[u] = float('inf')
+
+        self.dist['NIL'] = float('inf')
+
+        while queue:
+            u = queue.popleft()
+            if u != 'NIL':
+                for v in self.graph[u]:
+                    next_u = self.matches.get(v, 'NIL')
+                    if self.dist[next_u] == float('inf'):
+                        self.dist[next_u] = self.dist[u] + 1
+                        queue.append(next_u)
+
+        return self.dist['NIL'] != float('inf')
+
+    def dfs(self, u):
+        if u != 'NIL':
+            for v in self.graph[u]:
+                next_u = self.matches.get(v, 'NIL')
+                if self.dist[next_u] == self.dist[u] + 1:
+                    if self.dfs(next_u):
+                        self.matches[v] = u
+                        self.matches[u] = v
+                        return True
+            self.dist[u] = float('inf')
+            return False
+        return True
+
+    def hopcroft_karp(self):
+        result = 0
+        while self.bfs():
+            for u in self.graph:
+                if u not in self.matches:
+                    if self.dfs(u):
+                        result += 1
+        return result
+
+def visualize_bipartite_graph(resources, destinations, matches, resource_type, dest_type):
+    G = nx.Graph()
+    G.add_nodes_from(resources, bipartite=0)
+    G.add_nodes_from(destinations, bipartite=1)
+
+    resource_spacing = 1.0 / (len(resources) + 1)
+    dest_spacing = 1.0 / (len(destinations) + 1)
+
+    pos = {}
+    for i, resource in enumerate(resources, 1):
+        pos[resource] = (-2, 1 - i * resource_spacing)
+    for i, dest in enumerate(destinations, 1):
+        pos[dest] = (2, 1 - i * dest_spacing)
+
+    matched_edges = []
+    unmatched_edges = []
+
+    for resource in resources:
+        for dest in destinations:
+            if matches.get(resource) == dest or matches.get(dest) == resource:
+                matched_edges.append((resource, dest))
+                G.add_edge(resource, dest)
+            else:
+                unmatched_edges.append((resource, dest))
+                G.add_edge(resource, dest)
+
+    plt.figure(figsize=(15, 10))
+
+    nx.draw_networkx_nodes(G, pos,
+                          nodelist=resources,
+                          node_color='lightblue',
+                          node_size=2000,
+                          node_shape='o')
+
+    nx.draw_networkx_nodes(G, pos,
+                          nodelist=destinations,
+                          node_color='lightgreen',
+                          node_size=2000,
+                          node_shape='s')
+
+    nx.draw_networkx_edges(G, pos,
+                          edgelist=unmatched_edges,
+                          edge_color='gray',
+                          alpha=0.2,
+                          style='dashed')
+
+    nx.draw_networkx_edges(G, pos,
+                          edgelist=matched_edges,
+                          edge_color='red',
+                          width=2.0)
+
+    nx.draw_networkx_labels(G, pos, font_size=8)
+
+    plt.title(f"{resource_type}-{dest_type} Assignment Graph", pad=20, size=16)
+    plt.plot([], [], 'red', linewidth=2, label='Assigned')
+    plt.plot([], [], 'gray', linestyle='--', alpha=0.2, label='Possible Assignment')
+    plt.plot([], [], 'o', color='lightblue', label=resource_type)
+    plt.plot([], [], 's', color='lightgreen', label=dest_type)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+def generate_resources(resource_type, count):
+    """Generate resource IDs based on type and count"""
+    resources = []
+
+    if resource_type == "Oxygen Cylinders":
+        resources = [f"Cylinder_{i+1}" for i in range(count)]
+    elif resource_type == "Doctors":
+        prefix = ["Dr", "Dr", "Dr", "Dr"]  # Common prefixes
+        names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller",
+                "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez"]
+        resources = [f"{prefix[i % len(prefix)]} {names[i % len(names)]}_{i+1}"
+                    for i in range(count)]
+    elif resource_type == "Beds":
+        resources = [f"Bed_{i+1}" for i in range(count)]
+    elif resource_type == "Nurses":
+        names = ["Adams", "Baker", "Clark", "Davis", "Evans", "Foster", "Green",
+                "Harris", "Irving", "Johnson", "Kelly", "Lewis", "Morgan"]
+        resources = [f"Nurse {names[i % len(names)]}_{i+1}" for i in range(count)]
+
+    return resources
+
+def generate_wards(count):
+    """Generate ward IDs"""
+    floors = range(1, (count // 10) + 2)  # Generate enough floors
+    wards = []
+    ward_num = 1
+
+    for floor in floors:
+        for room in range(1, 11):  # 10 rooms per floor
+            if ward_num <= count:
+                wards.append(f"Ward_{floor}0{room}" if room < 10 else f"Ward_{floor}{room}")
+                ward_num += 1
+
+    return wards[:count]  # Return only the requested number of wards
+
+def allocate_resources(resources, destinations, resource_type, dest_type):
+    bg = BipartiteGraph()
+
+    # Add edges
+    for resource in resources:
+        for dest in destinations:
+            bg.add_edge(resource, dest)
+
+    # Find maximum matching
+    max_matching = bg.hopcroft_karp()
+
+    # Print results
+    print(f"\n{resource_type} Allocation Results")
+    print("=" * 40)
+    print(f"\nTotal {resource_type}: {len(resources)}")
+    print(f"Total {dest_type}: {len(destinations)}")
+    print(f"Maximum number of allocations possible: {max_matching}")
+
+    print(f"\nOptimal {resource_type} Allocations:")
+    print("-" * 40)
+
+    # Sort and print assignments
+    assignments = []
+    for dest, resource in bg.matches.items():
+        if dest in destinations:
+            assignments.append((dest, resource))
+
+    for dest, resource in sorted(assignments):
+        print(f"{dest:15} -> {resource}")
+
+    # Print unassigned items
+    assigned_resources = set(resource for _, resource in assignments)
+    unassigned_resources = set(resources) - assigned_resources
+
+    assigned_dests = set(dest for dest, _ in assignments)
+    unassigned_dests = set(destinations) - assigned_dests
+
+    if unassigned_resources:
+        print(f"\nUnassigned {resource_type}:")
+        print("-" * 40)
+        for resource in sorted(unassigned_resources):
+            print(resource)
+
+    if unassigned_dests:
+        print(f"\nUnassigned {dest_type}:")
+        print("-" * 40)
+        for dest in sorted(unassigned_dests):
+            print(dest)
+
+    # Visualize the assignments
+    visualize_bipartite_graph(resources, destinations, bg.matches, resource_type, dest_type)
+
+def get_valid_integer_input(prompt, min_value=1):
+    while True:
+        try:
+            value = int(input(prompt))
+            if value >= min_value:
+                return value
+            print(f"Please enter a number greater than or equal to {min_value}")
+        except ValueError:
+            print("Please enter a valid number")
+
+def main():
+    while True:
+        print("\nHospital Resource Allocation System")
+        print("=" * 40)
+        print("1. Allocate Oxygen Cylinders to Wards")
+        print("2. Allocate Doctors to Wards")
+        print("3. Allocate Beds to Wards")
+        print("4. Allocate Nurses to Wards")
+        print("5. Exit")
+
+        choice = input("\nEnter your choice (1-5): ")
+
+        if choice == '5':
+            break
+
+        if choice in ['1', '2', '3', '4']:
+            # Get quantities from user
+            if choice == '1':
+                resource_type = "Oxygen Cylinders"
+            elif choice == '2':
+                resource_type = "Doctors"
+            elif choice == '3':
+                resource_type = "Beds"
+            else:
+                resource_type = "Nurses"
+
+            # Get quantities with input validation
+            resource_count = get_valid_integer_input(f"\nEnter number of {resource_type.lower()} needed: ")
+            ward_count = get_valid_integer_input("Enter number of wards: ")
+
+            # Generate resources and wards
+            resources = generate_resources(resource_type, resource_count)
+            destinations = generate_wards(ward_count)
+
+            # Perform allocation
+            allocate_resources(resources, destinations, resource_type, "Wards")
+        else:
+            print("Invalid choice! Please try again.")
+
+if __name__ == "__main__":
+    main()
