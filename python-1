@@ -1,0 +1,129 @@
+from collections import deque
+
+class BipartiteGraph:
+    def __init__(self):
+        self.graph = {}
+        self.matches = {}
+        self.dist = {}
+
+    def add_edge(self, u, v):
+        """Add edge between doctor u and ward v"""
+        if u not in self.graph:
+            self.graph[u] = []
+        self.graph[u].append(v)
+
+    def bfs(self):
+        """Breadth First Search to find shortest augmenting paths"""
+        queue = deque()
+
+        for u in self.graph:
+            if u not in self.matches:
+                self.dist[u] = 0
+                queue.append(u)
+            else:
+                self.dist[u] = float('inf')
+
+        self.dist['NIL'] = float('inf')
+
+        while queue:
+            u = queue.popleft()
+            if u != 'NIL':
+                for v in self.graph[u]:
+                    next_u = self.matches.get(v, 'NIL')
+                    if self.dist[next_u] == float('inf'):
+                        self.dist[next_u] = self.dist[u] + 1
+                        queue.append(next_u)
+
+        return self.dist['NIL'] != float('inf')
+
+    def dfs(self, u):
+        """Depth First Search to find augmenting paths"""
+        if u != 'NIL':
+            for v in self.graph[u]:
+                next_u = self.matches.get(v, 'NIL')
+                if self.dist[next_u] == self.dist[u] + 1:
+                    if self.dfs(next_u):
+                        self.matches[v] = u
+                        self.matches[u] = v
+                        return True
+            self.dist[u] = float('inf')
+            return False
+        return True
+
+    def hopcroft_karp(self):
+        """Main Hopcroft-Karp algorithm implementation"""
+        result = 0
+        while self.bfs():
+            for u in self.graph:
+                if u not in self.matches:
+                    if self.dfs(u):
+                        result += 1
+        return result
+
+def main():
+    # Initialize the doctor and ward lists
+    doctors = [
+        "Shell", "Regine", "Sissy", "Calestyna", "Thalia",
+        "Brynna", "Maye", "Concettina", "Minda", "Charissa",
+        "Lanae", "Ida", "Constancekarena"
+    ]
+
+    wards = [
+        "Ambil", "Aundh", "Bopodi", "Shivaji Nagar", "Hadapsar",
+        "Health Center", "Gujarat", "Mundhwa", "Pashan", "Bhawani",
+        "Wanowrie", "Yerawada", "Gururwar", "Kondhwa"
+    ]
+
+    # Create bipartite graph instance
+    bg = BipartiteGraph()
+
+    # Add edges - in this example, we'll assume each doctor can be assigned
+    # to any ward, but you can modify these connections based on actual constraints
+    for doctor in doctors:
+        for ward in wards:
+            bg.add_edge(doctor, ward)
+
+    # Find maximum matching
+    max_matching = bg.hopcroft_karp()
+
+    # Print results
+    print("\nHospital Ward Assignment System")
+    print("=" * 40)
+    print(f"\nTotal doctors: {len(doctors)}")
+    print(f"Total wards: {len(wards)}")
+    print(f"Maximum number of assignments possible: {max_matching}")
+
+    print("\nOptimal Ward Assignments:")
+    print("-" * 40)
+
+    # Sort assignments for cleaner output
+    assignments = []
+    for ward, doctor in bg.matches.items():
+        if ward in wards:  # Only print ward->doctor mappings
+            assignments.append((ward, doctor))
+
+    # Print sorted assignments
+    for ward, doctor in sorted(assignments):
+        print(f"{ward:15} -> Dr. {doctor}")
+
+    # Print unassigned doctors and wards
+    assigned_doctors = set(doctor for _, doctor in assignments)
+    unassigned_doctors = set(doctors) - assigned_doctors
+
+    assigned_wards = set(ward for ward, _ in assignments)
+    unassigned_wards = set(wards) - assigned_wards
+
+    if unassigned_doctors:
+        print("\nUnassigned Doctors:")
+        print("-" * 40)
+        for doctor in sorted(unassigned_doctors):
+            print(f"Dr. {doctor}")
+
+    if unassigned_wards:
+        print("\nUnassigned Wards:")
+        print("-" * 40)
+        for ward in sorted(unassigned_wards):
+            print(ward)
+
+if __name__ == "__main__":
+    main()
